@@ -28,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OLLAMA_BASE_URL = "http://localhost:11434"
+OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
 
 # Security constants
 MAX_FILE_READ_SIZE = 50 * 1024 * 1024  # 50MB

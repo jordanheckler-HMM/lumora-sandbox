@@ -79,6 +79,29 @@ Make sure Ollama is running on port 11434:
 curl http://localhost:11434/api/tags
 ```
 
+### 4. Configuration (Optional)
+
+You can customize the application by copying `.env.example` to `.env` and modifying:
+
+```bash
+# Copy environment template
+cp .env.example .env
+```
+
+See `.env.example` for available configuration options (API URLs, timeouts, etc.).
+
+## ⚠️ Important Notes
+
+**File Size Limits:**
+- File reads are limited to **50MB** maximum
+- CSV uploads are limited to **100MB** maximum
+- Files exceeding these limits will be rejected with an error
+
+**Security:**
+- This is a local development tool with no authentication
+- File operations can access any path your user has permissions for (except blocked system directories)
+- Only run on trusted networks and do not expose ports publicly
+
 ## 🎮 Usage
 
 1. **Open the app**: Navigate to `http://localhost:5174` in your browser
