@@ -23,7 +23,6 @@
     "react-data-grid": "^7.0.0-beta.58",
     "react-dom": "^19.2.0",
     "react-hot-toast": "^2.6.0",
-    "undefined": "^0.1.0",
     "zustand": "^5.0.9"
   },
   "devDependencies": {

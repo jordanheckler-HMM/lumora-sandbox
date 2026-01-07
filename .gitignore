@@ -37,3 +37,6 @@ logs/
 .env.local
 .env.*.local
 
+# Chat storage
+backend/chats/
+
