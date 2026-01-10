@@ -80,7 +80,8 @@ export const chatWithModelStreaming = async (
   messages: Message[],
   onChunk: (chunk: string) => void,
   onComplete: () => void,
-  onError: (error: string) => void
+  onError: (error: string) => void,
+  abortSignal?: AbortSignal
 ): Promise<void> => {
   // Convert to Ollama chat format (only role and content)
   const chatMessages = messages.map(msg => ({
@@ -98,6 +99,7 @@ export const chatWithModelStreaming = async (
         model,
         messages: chatMessages
       }),
+      signal: abortSignal,
     });
 
     if (!response.ok) {
@@ -148,7 +150,12 @@ export const chatWithModelStreaming = async (
       }
     }
   } catch (error: any) {
-    onError(error.message || 'Streaming error occurred');
+    // Check if it was an abort
+    if (error.name === 'AbortError') {
+      onError('Generation stopped by user');
+    } else {
+      onError(error.message || 'Streaming error occurred');
+    }
   }
 };
 

@@ -208,6 +208,7 @@ export const ChatPanel = () => {
   const isMountedRef = useRef(true);
   const initAbortController = useRef<AbortController | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Helper functions
   const getErrorMessage = (error: unknown): string => {
@@ -369,6 +370,10 @@ export const ChatPanel = () => {
     // Capture whether user is at bottom BEFORE streaming starts
     setShouldAutoScroll(isAtBottom());
 
+    // Create new abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     // Get all messages including the new user message for full context
     const allMessages = useAppState.getState().messages;
     
@@ -388,6 +393,7 @@ export const ChatPanel = () => {
       async () => {
         setIsLoading(false);
         setStreamingContent('');
+        abortControllerRef.current = null;  // Clear abort controller
         
         // Create final assistant message
         const assistantMessage = { 
@@ -411,25 +417,49 @@ export const ChatPanel = () => {
       async (error: string) => {
         setIsLoading(false);
         setStreamingContent('');
+        abortControllerRef.current = null;  // Clear abort controller
         
-        const errorMessage = {
-          id: `error-${Date.now()}-${Math.random()}`,
-          role: 'assistant' as const,
-          content: `Error: ${error}`,
-          model: currentModel,
-          timestamp: Date.now()
-        };
-        addMessage(errorMessage);
+        // Only add error message if it's not a user-initiated stop
+        if (!error.includes('stopped by user')) {
+          const errorMessage = {
+            id: `error-${Date.now()}-${Math.random()}`,
+            role: 'assistant' as const,
+            content: `Error: ${error}`,
+            model: currentModel,
+            timestamp: Date.now()
+          };
+          addMessage(errorMessage);
+        } else {
+          // If user stopped, save the partial response
+          if (fullResponse.trim()) {
+            const assistantMessage = { 
+              id: assistantMessageId,
+              role: 'assistant' as const, 
+              content: fullResponse + '\n\n_[Generation stopped]_',
+              model: currentModel,
+              timestamp: Date.now()
+            };
+            addMessage(assistantMessage);
+          }
+        }
         
-        // Save even error messages
+        // Save even error messages or partial responses
         const updatedMessages = useAppState.getState().messages;
         await saveSessionSafely(
           activeSessionId, 
           sessionTitle, 
           updatedMessages
         );
-      }
+      },
+      abortController.signal  // Pass abort signal
     );
+  };
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
   };
 
   const handleFollowUp = (question: string) => {
@@ -614,13 +644,31 @@ export const ChatPanel = () => {
             rows={3}
             disabled={isLoading || !selectedModel}
           />
-          <button
-            onClick={() => handleSend()}
-            disabled={!input.trim() || isLoading || !selectedModel}
-            className="px-6 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-          >
-            Send
-          </button>
+          {isLoading ? (
+            // Stop button when loading
+            <button
+              onClick={handleStop}
+              className="px-6 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center"
+              title="Stop generating"
+            >
+              <svg 
+                className="w-5 h-5" 
+                viewBox="0 0 24 24" 
+                fill="currentColor"
+              >
+                <rect x="6" y="6" width="12" height="12" rx="1" />
+              </svg>
+            </button>
+          ) : (
+            // Send button when not loading
+            <button
+              onClick={() => handleSend()}
+              disabled={!input.trim() || !selectedModel}
+              className="px-6 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            >
+              Send
+            </button>
+          )}
         </div>
         {!selectedModel && (
           <div className="text-sm text-red-500 mt-2">
