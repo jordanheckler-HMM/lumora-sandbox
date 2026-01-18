@@ -34,6 +34,128 @@ const formatTimestamp = (timestamp: number): string => {
 };
 
 /**
+ * Confirmation Modal Component
+ */
+const ConfirmModal = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  title, 
+  message 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onConfirm: () => void; 
+  title: string; 
+  message: string;
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+        <p className="text-gray-600 mb-6">{message}</p>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Input Modal Component
+ */
+const InputModal = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  title, 
+  label,
+  defaultValue,
+  placeholder
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onConfirm: (value: string) => void; 
+  title: string;
+  label: string;
+  defaultValue?: string;
+  placeholder?: string;
+}) => {
+  const [value, setValue] = useState(defaultValue || '');
+
+  useEffect(() => {
+    if (isOpen) {
+      setValue(defaultValue || '');
+    }
+  }, [isOpen, defaultValue]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = () => {
+    if (value.trim()) {
+      onConfirm(value.trim());
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {label}
+        </label>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              handleSubmit();
+            }
+          }}
+          placeholder={placeholder}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+          autoFocus
+        />
+        <div className="flex gap-3 justify-end mt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!value.trim()}
+            className="px-4 py-2 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
  * Component to render streaming markdown content in real-time
  */
 const StreamingMessage = ({ content, model }: { content: string; model: string }) => {
@@ -210,13 +332,11 @@ export const ChatPanel = () => {
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  // Helper functions
-  const getErrorMessage = (error: unknown): string => {
-    if (error instanceof Error) return error.message;
-    if (typeof error === 'string') return error;
-    return 'An unknown error occurred';
-  };
+  // Modal states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
   
+  // Helper functions
   const saveSessionSafely = async (sessionId: string, title: string, messages: Message[]) => {
     // Queue saves to prevent concurrent writes
     saveQueueRef.current = saveQueueRef.current
@@ -486,27 +606,33 @@ export const ChatPanel = () => {
     sessionMessages.forEach(msg => addMessage(msg));
   };
 
-  const handleRenameChat = async () => {
+  const handleRenameChat = () => {
+    if (!activeSessionId) return;
+    setShowRenameModal(true);
+  };
+
+  const handleRenameConfirm = async (newTitle: string) => {
     if (!activeSessionId) return;
     
     const currentSession = sessions.find(s => s.id === activeSessionId);
-    const newTitle = window.prompt('Enter new chat title:', currentSession?.title || 'New Chat');
-    
-    if (newTitle && newTitle.trim() && newTitle !== currentSession?.title) {
+    if (newTitle && newTitle !== currentSession?.title) {
       // Update in store
-      updateSessionTitle(activeSessionId, newTitle.trim());
+      updateSessionTitle(activeSessionId, newTitle);
       
       // Save to backend
       const currentMessages = useAppState.getState().messages;
-      await saveCurrentSession(activeSessionId, newTitle.trim(), currentMessages);
+      await saveCurrentSession(activeSessionId, newTitle, currentMessages);
+      toast.success('Chat renamed successfully');
     }
   };
 
-  const handleDeleteChat = async () => {
+  const handleDeleteChat = () => {
     if (!activeSessionId) return;
-    
-    const confirmed = window.confirm('Are you sure you want to delete this chat?');
-    if (!confirmed) return;
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!activeSessionId) return;
     
     try {
       // Delete from backend
@@ -530,6 +656,8 @@ export const ChatPanel = () => {
         clearMessages();
         sessionMessages.forEach(msg => addMessage(msg));
       }
+      
+      toast.success('Chat deleted successfully');
     } catch (error) {
       console.error('Failed to delete chat:', error);
       toast.error('Failed to delete chat');
@@ -676,6 +804,25 @@ export const ChatPanel = () => {
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Chat"
+        message="Are you sure you want to delete this chat? This action cannot be undone."
+      />
+      
+      <InputModal
+        isOpen={showRenameModal}
+        onClose={() => setShowRenameModal(false)}
+        onConfirm={handleRenameConfirm}
+        title="Rename Chat"
+        label="Chat Title"
+        defaultValue={sessions.find(s => s.id === activeSessionId)?.title || 'New Chat'}
+        placeholder="Enter chat title"
+      />
     </div>
   );
 };

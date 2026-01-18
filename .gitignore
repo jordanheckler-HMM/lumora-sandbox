@@ -40,3 +40,20 @@ logs/
 # Chat storage
 backend/chats/
 
+
+# Backend build artifacts (too large for GitHub)
+backend/build/
+backend/dist/
+backend/*.spec
+
+# Tauri build artifacts
+frontend/src-tauri/binaries/
+frontend/src-tauri/target/
+# Backend build artifacts (too large for GitHub)
+backend/build/
+backend/dist/
+backend/*.spec
+
+# Tauri build artifacts
+frontend/src-tauri/binaries/
+frontend/src-tauri/target/

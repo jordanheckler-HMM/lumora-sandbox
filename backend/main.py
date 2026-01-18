@@ -18,7 +18,7 @@ app = FastAPI(title="LUMORA Sandbox API")
 app.include_router(tools_router, prefix="/api/tools", tags=["tools"])
 
 # CORS configuration - supports environment variable for production
-ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:5174').split(',')
+ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:5174,tauri://localhost,https://tauri.localhost,http://tauri.localhost').split(',')
 
 app.add_middleware(
     CORSMiddleware,

@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "npm run tauri:build-backend && tauri build",
+    "tauri:build-backend": "node scripts/build-backend.js",
+    "verify-ollama": "node scripts/verify-ollama.js"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -29,6 +34,8 @@
     "@eslint/js": "^9.39.1",
     "@tailwindcss/postcss": "^4.1.17",
     "@tailwindcss/typography": "^0.5.19",
+    "@tauri-apps/api": "^2.9.1",
+    "@tauri-apps/cli": "^2.9.6",
     "@types/dompurify": "^3.0.5",
     "@types/marked": "^5.0.2",
     "@types/node": "^24.10.1",
