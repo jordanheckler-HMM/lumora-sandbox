@@ -2,6 +2,7 @@ use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
+use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 // Global state to hold the backend process
@@ -49,33 +50,21 @@ fn start_backend_sidecar(app_handle: AppHandle) {
     tauri::async_runtime::spawn(async move {
         log::info!("Starting backend sidecar...");
 
-        // Get the sidecar binary path
-        let result = tauri::async_runtime::spawn_blocking(move || {
-            // Resolve the sidecar path based on platform
-            let binary_name = if cfg!(target_os = "windows") {
-                "backend-server.exe"
-            } else {
-                "backend-server"
-            };
-
-            let sidecar_path = handle_clone
-                .path()
-                .resource_dir()
-                .expect("Failed to get resource dir")
-                .join("binaries")
-                .join(binary_name);
+        // Get and start the sidecar binary path.
+        let result = tauri::async_runtime::spawn_blocking(move || -> Result<Child, String> {
+            let sidecar_path = resolve_backend_sidecar_path(&handle_clone)
+                .ok_or_else(|| "Unable to resolve backend sidecar path in app bundle".to_string())?;
 
             log::info!("Backend sidecar path: {:?}", sidecar_path);
 
-            // Start the backend process
             Command::new(&sidecar_path)
                 .spawn()
-                .expect("Failed to start backend sidecar")
+                .map_err(|err| format!("Failed to start backend sidecar at {:?}: {}", sidecar_path, err))
         })
         .await;
 
         match result {
-            Ok(child) => {
+            Ok(Ok(child)) => {
                 log::info!("Backend sidecar started successfully");
 
                 // Store the process handle
@@ -89,9 +78,52 @@ fn start_backend_sidecar(app_handle: AppHandle) {
                 thread::sleep(Duration::from_secs(2));
                 log::info!("Backend should be ready on http://localhost:8000");
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 log::error!("Failed to start backend sidecar: {}", e);
+            }
+            Err(e) => {
+                log::error!("Failed to start backend sidecar task: {}", e);
             }
         }
     });
+}
+
+fn backend_binary_name() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "backend-server.exe"
+    } else {
+        "backend-server"
+    }
+}
+
+fn resolve_backend_sidecar_path(app_handle: &AppHandle) -> Option<PathBuf> {
+    let binary_name = backend_binary_name();
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(executable_dir) = app_handle.path().executable_dir() {
+        candidates.push(executable_dir.join(binary_name));
+    }
+
+    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+        candidates.push(resource_dir.join("binaries").join(binary_name));
+        candidates.push(resource_dir.join(binary_name));
+    }
+
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(parent) = current_exe.parent() {
+            candidates.push(parent.join(binary_name));
+        }
+    }
+
+    for candidate in &candidates {
+        if candidate.exists() {
+            return Some(candidate.clone());
+        }
+    }
+
+    log::error!(
+        "Backend sidecar not found. Checked locations: {:?}",
+        candidates
+    );
+    None
 }
