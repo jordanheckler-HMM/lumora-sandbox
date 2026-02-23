@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAppState } from '../store/appState';
 import { fetchModels } from '../api';
 import type { Model } from '../api';
+import { isTauri } from '@tauri-apps/api/core';
+import { check, type Update } from '@tauri-apps/plugin-updater';
+import toast from 'react-hot-toast';
 
 const tabs = [
   { id: 'chat' as const, label: 'Chat', icon: '💬' },
@@ -18,12 +21,10 @@ export const Sidebar = () => {
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
+  const [installingUpdate, setInstallingUpdate] = useState(false);
 
-  useEffect(() => {
-    loadModels();
-  }, []);
-
-  const loadModels = async () => {
+  const loadModels = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -32,11 +33,64 @@ export const Sidebar = () => {
       if (modelsList.length > 0 && !selectedModel) {
         setSelectedModel(modelsList[0].name);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to load models');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load models';
+      setError(message);
       console.error('Error loading models:', err);
     } finally {
       setLoading(false);
+    }
+  }, [selectedModel, setSelectedModel]);
+
+  useEffect(() => {
+    loadModels();
+  }, [loadModels]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkForUpdates = async () => {
+      if (!isTauri()) {
+        return;
+      }
+
+      try {
+        const update = await check();
+        if (!cancelled) {
+          setAvailableUpdate(update);
+        } else if (update) {
+          await update.close();
+        }
+      } catch (updateError) {
+        // Keep this silent in UI; logs are enough for troubleshooting.
+        console.error('Failed to check for updates:', updateError);
+      }
+    };
+
+    checkForUpdates();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleInstallUpdate = async () => {
+    if (!availableUpdate || installingUpdate) {
+      return;
+    }
+
+    try {
+      setInstallingUpdate(true);
+      toast.loading('Downloading update...', { id: 'app-update' });
+      await availableUpdate.downloadAndInstall();
+      await availableUpdate.close();
+      setAvailableUpdate(null);
+      toast.success('Update installed. Restart the app to finish.', { id: 'app-update' });
+    } catch (installError) {
+      console.error('Failed to install update:', installError);
+      toast.error('Update failed. Please try again later.', { id: 'app-update' });
+    } finally {
+      setInstallingUpdate(false);
     }
   };
 
@@ -104,6 +158,16 @@ export const Sidebar = () => {
 
       {/* Footer */}
       <div className="p-4 border-t border-gray-800 text-xs text-gray-500">
+        {availableUpdate && (
+          <button
+            onClick={handleInstallUpdate}
+            disabled={installingUpdate}
+            className="w-full mb-3 px-2 py-1.5 text-xs rounded bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+            title="Install available update"
+          >
+            {installingUpdate ? 'Installing update...' : `Update available: v${availableUpdate.version}`}
+          </button>
+        )}
         <div>Local AI • Ollama</div>
         <div className="mt-1">
           {models.length} model{models.length !== 1 ? 's' : ''} available
@@ -112,4 +176,3 @@ export const Sidebar = () => {
     </div>
   );
 };
-

@@ -6,6 +6,7 @@ import httpx
 import aiofiles
 import os
 import json
+import re
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 import pandas as pd
@@ -29,6 +30,8 @@ app.add_middleware(
 )
 
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+WORKSPACE_ROOT = Path(os.getenv('WORKSPACE_ROOT', str(Path.home()))).expanduser().resolve()
+CHAT_ID_PATTERN = re.compile(r'^[A-Za-z0-9_-]+$')
 
 # Security constants
 MAX_FILE_READ_SIZE = 50 * 1024 * 1024  # 50MB
@@ -38,13 +41,12 @@ MAX_CSV_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
 def validate_safe_path(requested_path: str, allowed_base: Optional[str] = None) -> Path:
     """Validate path is safe and within allowed boundaries"""
     resolved = Path(requested_path).expanduser().resolve()
-    
-    if allowed_base:
-        allowed = Path(allowed_base).resolve()
-        try:
-            resolved.relative_to(allowed)
-        except ValueError:
-            raise HTTPException(status_code=403, detail="Path outside allowed directory")
+
+    allowed = Path(allowed_base).expanduser().resolve() if allowed_base else WORKSPACE_ROOT
+    try:
+        resolved.relative_to(allowed)
+    except ValueError:
+        raise HTTPException(status_code=403, detail=f"Path outside allowed workspace root: {allowed}")
     
     # Block sensitive paths
     sensitive_patterns = ['/etc/', '/sys/', '/proc/', '/.ssh/', '/root/']
@@ -53,6 +55,12 @@ def validate_safe_path(requested_path: str, allowed_base: Optional[str] = None) 
         raise HTTPException(status_code=403, detail="Access to system directories denied")
     
     return resolved
+
+def validate_chat_id(chat_id: str) -> str:
+    """Allow only simple chat identifiers to prevent path traversal."""
+    if not CHAT_ID_PATTERN.fullmatch(chat_id):
+        raise HTTPException(status_code=400, detail="Invalid chat ID format")
+    return chat_id
 
 # Pydantic models
 class RunModelRequest(BaseModel):
@@ -343,7 +351,7 @@ async def get_workspace_files(path: str = "."):
     - Returns simple directory structure
     """
     try:
-        root_path = Path(path).expanduser().resolve()
+        root_path = validate_safe_path(path)
         
         if not root_path.exists():
             raise HTTPException(status_code=404, detail="Path not found")
@@ -486,7 +494,8 @@ async def list_chats():
 async def get_chat(chat_id: str):
     """Get full chat session by ID"""
     try:
-        chat_file = CHATS_DIR / f"{chat_id}.json"
+        safe_chat_id = validate_chat_id(chat_id)
+        chat_file = CHATS_DIR / f"{safe_chat_id}.json"
         
         if not chat_file.exists():
             raise HTTPException(status_code=404, detail="Chat not found")
@@ -505,7 +514,8 @@ async def get_chat(chat_id: str):
 async def save_chat(request: SaveChatRequest):
     """Save or update a chat session"""
     try:
-        chat_file = CHATS_DIR / f"{request.id}.json"
+        safe_chat_id = validate_chat_id(request.id)
+        chat_file = CHATS_DIR / f"{safe_chat_id}.json"
         
         # Check if chat exists to preserve createdAt
         created_at = int(pd.Timestamp.now().timestamp() * 1000)
@@ -517,7 +527,7 @@ async def save_chat(request: SaveChatRequest):
         
         # Prepare chat data
         chat_data = {
-            "id": request.id,
+            "id": safe_chat_id,
             "title": request.title,
             "createdAt": created_at,
             "updatedAt": int(pd.Timestamp.now().timestamp() * 1000),
@@ -530,10 +540,12 @@ async def save_chat(request: SaveChatRequest):
         
         return {
             "success": True,
-            "id": request.id,
+            "id": safe_chat_id,
             "createdAt": created_at,
             "updatedAt": chat_data["updatedAt"]
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -541,7 +553,8 @@ async def save_chat(request: SaveChatRequest):
 async def delete_chat(chat_id: str):
     """Delete a chat session"""
     try:
-        chat_file = CHATS_DIR / f"{chat_id}.json"
+        safe_chat_id = validate_chat_id(chat_id)
+        chat_file = CHATS_DIR / f"{safe_chat_id}.json"
         
         if not chat_file.exists():
             raise HTTPException(status_code=404, detail="Chat not found")
@@ -558,4 +571,3 @@ async def delete_chat(chat_id: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

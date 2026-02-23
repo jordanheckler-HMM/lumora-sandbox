@@ -4,3 +4,6 @@
 /gen/schemas
 # Backend binaries (generated during build)
 /binaries/
+
+# Updater signing keys (never commit)
+/keys/

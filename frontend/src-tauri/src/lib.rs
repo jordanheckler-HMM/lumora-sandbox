@@ -1,15 +1,16 @@
-use tauri::{Manager, AppHandle};
-use std::process::{Command, Child};
+use std::process::{Child, Command};
 use std::sync::Mutex;
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
+use tauri::{AppHandle, Manager};
 
 // Global state to hold the backend process
 struct BackendProcess(Mutex<Option<Child>>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
+    tauri::Builder::default()
+    .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_log::Builder::default().build())
     .manage(BackendProcess(Mutex::new(None)))
     .setup(|app| {
@@ -43,53 +44,54 @@ pub fn run() {
 }
 
 fn start_backend_sidecar(app_handle: AppHandle) {
-  let handle_clone = app_handle.clone();
-  
-  tauri::async_runtime::spawn(async move {
-    log::info!("Starting backend sidecar...");
-    
-    // Get the sidecar binary path
-    let result = tauri::async_runtime::spawn_blocking(move || {
-      // Resolve the sidecar path based on platform
-      let binary_name = if cfg!(target_os = "windows") {
-        "backend-server.exe"
-      } else {
-        "backend-server"
-      };
-      
-      let sidecar_path = handle_clone
-        .path()
-        .resource_dir()
-        .expect("Failed to get resource dir")
-        .join("binaries")
-        .join(binary_name);
-      
-      log::info!("Backend sidecar path: {:?}", sidecar_path);
-      
-      // Start the backend process
-      Command::new(&sidecar_path)
-        .spawn()
-        .expect("Failed to start backend sidecar")
-    }).await;
-    
-    match result {
-      Ok(child) => {
-        log::info!("Backend sidecar started successfully");
-        
-        // Store the process handle
-        if let Some(backend_state) = app_handle.try_state::<BackendProcess>() {
-          if let Ok(mut process_guard) = backend_state.0.lock() {
-            *process_guard = Some(child);
-          }
+    let handle_clone = app_handle.clone();
+
+    tauri::async_runtime::spawn(async move {
+        log::info!("Starting backend sidecar...");
+
+        // Get the sidecar binary path
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            // Resolve the sidecar path based on platform
+            let binary_name = if cfg!(target_os = "windows") {
+                "backend-server.exe"
+            } else {
+                "backend-server"
+            };
+
+            let sidecar_path = handle_clone
+                .path()
+                .resource_dir()
+                .expect("Failed to get resource dir")
+                .join("binaries")
+                .join(binary_name);
+
+            log::info!("Backend sidecar path: {:?}", sidecar_path);
+
+            // Start the backend process
+            Command::new(&sidecar_path)
+                .spawn()
+                .expect("Failed to start backend sidecar")
+        })
+        .await;
+
+        match result {
+            Ok(child) => {
+                log::info!("Backend sidecar started successfully");
+
+                // Store the process handle
+                if let Some(backend_state) = app_handle.try_state::<BackendProcess>() {
+                    if let Ok(mut process_guard) = backend_state.0.lock() {
+                        *process_guard = Some(child);
+                    }
+                }
+
+                // Wait a bit for backend to start
+                thread::sleep(Duration::from_secs(2));
+                log::info!("Backend should be ready on http://localhost:8000");
+            }
+            Err(e) => {
+                log::error!("Failed to start backend sidecar: {}", e);
+            }
         }
-        
-        // Wait a bit for backend to start
-        thread::sleep(Duration::from_secs(2));
-        log::info!("Backend should be ready on http://localhost:8000");
-      }
-      Err(e) => {
-        log::error!("Failed to start backend sidecar: {}", e);
-      }
-    }
-  });
+    });
 }

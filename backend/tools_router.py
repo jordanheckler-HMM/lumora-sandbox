@@ -14,6 +14,7 @@ import aiofiles
 router = APIRouter()
 
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+WORKSPACE_ROOT = Path(os.getenv('WORKSPACE_ROOT', str(Path.home()))).expanduser().resolve()
 
 # Pydantic models
 class ToolRunRequest(BaseModel):
@@ -36,14 +37,27 @@ async def run_ollama_model(model: str, prompt: str) -> str:
                     "stream": False
                 }
             )
-            
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("response", "")
-            else:
-                return f"Error: Model returned status {response.status_code}"
+            response.raise_for_status()
+
+            data = response.json()
+            return data.get("response", "")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=503, detail=f"Cannot connect to Ollama: {str(e)}")
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"Model returned status {e.response.status_code}")
+    except HTTPException:
+        raise
     except Exception as e:
-        return f"Error calling model: {str(e)}"
+        raise HTTPException(status_code=500, detail=f"Error calling model: {str(e)}")
+
+def validate_workspace_path(workspace_path: str) -> Path:
+    """Ensure tool workspace scans stay inside configured workspace root."""
+    resolved = Path(workspace_path).expanduser().resolve()
+    try:
+        resolved.relative_to(WORKSPACE_ROOT)
+    except ValueError:
+        raise HTTPException(status_code=403, detail=f"Path outside allowed workspace root: {WORKSPACE_ROOT}")
+    return resolved
 
 def scan_workspace_structure(workspace_path: str, max_depth: int = 4) -> Dict[str, Any]:
     """Scan workspace directory structure (safe, read-only)"""
@@ -395,7 +409,7 @@ async def run_tool(request: ToolRunRequest):
     """Run a workspace analysis tool"""
     try:
         tool_name = request.toolName
-        workspace_path = request.workspacePath
+        workspace_path = str(validate_workspace_path(request.workspacePath))
         model = request.model
         
         if not model:
@@ -426,4 +440,3 @@ async def run_tool(request: ToolRunRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Tool execution failed: {str(e)}")
-
