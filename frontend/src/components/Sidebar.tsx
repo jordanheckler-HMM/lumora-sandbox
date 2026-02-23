@@ -3,6 +3,7 @@ import { useAppState } from '../store/appState';
 import { fetchModels } from '../api';
 import type { Model } from '../api';
 import { isTauri } from '@tauri-apps/api/core';
+import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import toast from 'react-hot-toast';
 
@@ -84,8 +85,8 @@ export const Sidebar = () => {
       toast.loading('Downloading update...', { id: 'app-update' });
       await availableUpdate.downloadAndInstall();
       await availableUpdate.close();
-      setAvailableUpdate(null);
-      toast.success('Update installed. Restart the app to finish.', { id: 'app-update' });
+      toast.loading('Update installed. Restarting app...', { id: 'app-update' });
+      await relaunch();
     } catch (installError) {
       console.error('Failed to install update:', installError);
       toast.error('Update failed. Please try again later.', { id: 'app-update' });
