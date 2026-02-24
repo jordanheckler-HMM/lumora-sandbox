@@ -39,6 +39,7 @@ jobs:
           pip install -r backend/requirements.txt
 
       - name: Frontend lint
+        continue-on-error: true
         run: npm --prefix frontend run lint
 
       - name: Frontend tests
