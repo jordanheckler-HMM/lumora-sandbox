@@ -83,7 +83,7 @@ export const readRtf = async (file: File): Promise<string> => {
   const content = await readTxt(file);
   
   // Basic RTF stripping - remove RTF commands
-  let text = content
+  const text = content
     .replace(/\{\\rtf1[^}]*\}/g, '')  // Remove RTF header
     .replace(/\{\\fonttbl[^}]*\}/g, '') // Remove font table
     .replace(/\{\\colortbl[^}]*\}/g, '') // Remove color table
@@ -100,7 +100,8 @@ export const readRtf = async (file: File): Promise<string> => {
  * Note: This requires a library like mammoth.js for proper parsing
  * For now, we'll just reject DOCX until we add proper support
  */
-export const readDocx = async (_file: File): Promise<string> => {
+export const readDocx = async (file: File): Promise<string> => {
+  void file;
   // For basic implementation, we'll need mammoth or similar
   // For now, return a placeholder
   throw new Error('DOCX import requires mammoth.js - please use .txt or .md for now');
@@ -119,4 +120,3 @@ export const downloadBlob = (blob: Blob, filename: string) => {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
-

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAppState } from '../store/appState';
-import { fetchModels } from '../api';
-import type { Model } from '../api';
+import { fetchModels, fetchSystemHealth } from '../api';
+import type { Model, SystemHealth } from '../api';
 import { isTauri } from '@tauri-apps/api/core';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type Update } from '@tauri-apps/plugin-updater';
@@ -22,6 +22,9 @@ export const Sidebar = () => {
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [healthError, setHealthError] = useState<string | null>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
   const [installingUpdate, setInstallingUpdate] = useState(false);
 
@@ -43,9 +46,36 @@ export const Sidebar = () => {
     }
   }, [selectedModel, setSelectedModel]);
 
+  const loadSystemHealth = useCallback(async () => {
+    try {
+      setHealthLoading(true);
+      setHealthError(null);
+      const healthData = await fetchSystemHealth();
+      setHealth(healthData);
+    } catch (healthCheckError: unknown) {
+      const message = healthCheckError instanceof Error ? healthCheckError.message : 'Health check failed';
+      setHealth(null);
+      setHealthError(message);
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadModels();
   }, [loadModels]);
+
+  useEffect(() => {
+    loadSystemHealth();
+
+    const intervalId = window.setInterval(() => {
+      loadSystemHealth();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [loadSystemHealth]);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +104,13 @@ export const Sidebar = () => {
       cancelled = true;
     };
   }, []);
+
+  const handleRetryConnections = async () => {
+    await Promise.all([loadSystemHealth(), loadModels()]);
+  };
+
+  const backendStatus = health ? 'online' : healthLoading ? 'checking' : 'offline';
+  const ollamaStatus = health?.ollama.status ?? 'unknown';
 
   const handleInstallUpdate = async () => {
     if (!availableUpdate || installingUpdate) {
@@ -116,10 +153,10 @@ export const Sidebar = () => {
           <div className="text-sm text-red-400">
             <div className="mb-2">{error}</div>
             <button
-              onClick={loadModels}
+              onClick={handleRetryConnections}
               className="text-xs bg-red-900 hover:bg-red-800 px-2 py-1 rounded"
             >
-              Retry
+              Retry Connection
             </button>
           </div>
         ) : (
@@ -135,6 +172,61 @@ export const Sidebar = () => {
             ))}
           </select>
         )}
+
+        <div className="mt-3 pt-3 border-t border-gray-800 text-xs space-y-1.5">
+          <div className="flex items-center gap-2 text-gray-400">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                backendStatus === 'online'
+                  ? 'bg-green-500'
+                  : backendStatus === 'offline'
+                    ? 'bg-red-500'
+                    : 'bg-yellow-500 animate-pulse'
+              }`}
+            ></span>
+            <span>
+              Backend: {
+                backendStatus === 'online'
+                  ? 'Connected'
+                  : backendStatus === 'offline'
+                    ? 'Offline'
+                    : 'Checking'
+              }
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-gray-400">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                ollamaStatus === 'ok'
+                  ? 'bg-green-500'
+                  : ollamaStatus === 'error'
+                    ? 'bg-red-500'
+                    : 'bg-yellow-500'
+              }`}
+            ></span>
+            <span>
+              Ollama: {ollamaStatus === 'ok' ? 'Connected' : ollamaStatus === 'error' ? 'Unavailable' : 'Unknown'}
+            </span>
+          </div>
+          {health?.ollama.status === 'error' && (
+            <div className="text-[11px] text-yellow-400">
+              Start Ollama, then retry connection.
+            </div>
+          )}
+          {healthError && (
+            <div className="text-[11px] text-red-400 truncate" title={healthError}>
+              {healthError}
+            </div>
+          )}
+          {(backendStatus !== 'online' || ollamaStatus === 'error') && (
+            <button
+              onClick={handleRetryConnections}
+              className="mt-1 px-2 py-1 rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition-colors"
+            >
+              Retry Connection
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}

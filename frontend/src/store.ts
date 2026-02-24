@@ -5,7 +5,7 @@ export interface ToolOutput {
   id: string;
   timestamp: Date;
   type: 'read' | 'write' | 'search';
-  data: any;
+  data: unknown;
 }
 
 interface AppState {
@@ -93,4 +93,3 @@ export const useStore = create<AppState>((set) => ({
   })),
   clearAIResponses: () => set({ aiResponses: [] }),
 }));
-

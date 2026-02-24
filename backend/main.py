@@ -120,6 +120,45 @@ CHATS_DIR.mkdir(exist_ok=True)
 async def root():
     return {"message": "LUMORA Sandbox API", "status": "running"}
 
+@app.get("/health")
+async def health():
+    """Service health for backend and Ollama dependency."""
+    health_payload: Dict[str, Any] = {
+        "backend": {"status": "ok"},
+        "ollama": {"status": "unknown", "models_available": 0},
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5.0)
+            response.raise_for_status()
+            data = response.json()
+            models = data.get("models", [])
+            health_payload["ollama"] = {
+                "status": "ok",
+                "models_available": len(models),
+            }
+    except httpx.RequestError as e:
+        health_payload["ollama"] = {
+            "status": "error",
+            "models_available": 0,
+            "error": f"Cannot connect to Ollama: {str(e)}",
+        }
+    except httpx.HTTPStatusError as e:
+        health_payload["ollama"] = {
+            "status": "error",
+            "models_available": 0,
+            "error": f"Ollama returned status {e.response.status_code}",
+        }
+    except Exception as e:
+        health_payload["ollama"] = {
+            "status": "error",
+            "models_available": 0,
+            "error": str(e),
+        }
+
+    return health_payload
+
 @app.get("/models")
 async def get_models():
     """Get list of available Ollama models"""

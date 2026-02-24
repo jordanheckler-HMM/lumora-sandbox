@@ -6,13 +6,15 @@
  */
 
 import { useState } from 'react';
+import type { MutableRefObject } from 'react';
+import type { editor as MonacoEditor } from 'monaco-editor';
 import { runModel } from '../../api';
 import { useAppState } from '../../store/appState';
 import { callGlobalHandler } from '../../utils/globalHandlers';
 import toast from 'react-hot-toast';
 
 interface CodeAIBarProps {
-  editorRef: React.MutableRefObject<any>;
+  editorRef: MutableRefObject<MonacoEditor.IStandaloneCodeEditor | null>;
   currentModel: string;
 }
 
@@ -106,11 +108,12 @@ export const CodeAIBar = ({ editorRef, currentModel }: CodeAIBarProps) => {
 
       // Get selected code or entire file
       const selection = editor.getSelection();
-      const hasSelection = !selection.isEmpty();
+      const hasSelection = selection ? !selection.isEmpty() : false;
       
       let codeToProcess: string;
-      if (hasSelection) {
-        codeToProcess = editor.getModel().getValueInRange(selection);
+      const model = editor.getModel();
+      if (hasSelection && selection && model) {
+        codeToProcess = model.getValueInRange(selection);
       } else {
         codeToProcess = editor.getValue();
       }
@@ -152,9 +155,10 @@ export const CodeAIBar = ({ editorRef, currentModel }: CodeAIBarProps) => {
       // DO NOT modify the editor automatically
       // User must explicitly click Insert/Replace/Replace All in the sidebar
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('AI action error:', error);
-      toast.error(`Error: ${error.message || 'Failed to process AI request'}`);
+      const message = error instanceof Error ? error.message : 'Failed to process AI request';
+      toast.error(`Error: ${message}`);
     } finally {
       setLoading(false);
       setCurrentAction('');
@@ -253,4 +257,3 @@ export const CodeAIBar = ({ editorRef, currentModel }: CodeAIBarProps) => {
     </div>
   );
 };
-

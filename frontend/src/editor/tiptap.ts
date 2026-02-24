@@ -5,12 +5,12 @@ import Link from '@tiptap/extension-link';
 import { useMemo } from 'react';
 
 // Debounce utility
-const debounce = <T extends (...args: any[]) => any>(
-  func: T,
+const debounce = <Args extends unknown[]>(
+  func: (...args: Args) => void,
   delay: number
-): ((...args: Parameters<T>) => void) => {
+): ((...args: Args) => void) => {
   let timeoutId: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
+  return (...args: Args) => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => func(...args), delay);
   };
@@ -49,4 +49,3 @@ export const useTipTapEditor = (content: string, onUpdate: (content: string) => 
     },
   });
 };
-

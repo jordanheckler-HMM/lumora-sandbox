@@ -31,6 +31,7 @@ Once running, visit:
 
 ### Core
 - `GET /` - Health check
+- `GET /health` - Backend + Ollama dependency status
 
 ### Models
 - `GET /models` - List available Ollama models
@@ -42,7 +43,7 @@ Once running, visit:
 - `POST /tools/search` - Search for files and content
 
 ### Workspace
-- `GET /workspace/files?path=/path` - Get recursive file tree
+- `GET /workspace/files?path=/path` - Get shallow file tree (immediate children only)
 
 ## CORS
 
@@ -59,4 +60,3 @@ Configured to allow requests from:
 - **httpx** - Async HTTP client for Ollama
 - **python-multipart** - Form data parsing
 - **requests** - HTTP library
-

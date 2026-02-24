@@ -133,9 +133,10 @@ export const DocumentAIBar = ({ editor, currentModel }: DocumentAIBarProps) => {
       // DO NOT modify the document automatically
       // User must explicitly click Insert/Replace/Replace All in the sidebar
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('AI action error:', error);
-      toast.error(`Error: ${error.message || 'Failed to process AI request'}`);
+      const message = error instanceof Error ? error.message : 'Failed to process AI request';
+      toast.error(`Error: ${message}`);
     } finally {
       setLoading(false);
       setCurrentAction('');
@@ -225,4 +226,3 @@ export const DocumentAIBar = ({ editor, currentModel }: DocumentAIBarProps) => {
     </div>
   );
 };
-

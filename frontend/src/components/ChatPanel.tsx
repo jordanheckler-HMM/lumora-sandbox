@@ -100,12 +100,6 @@ const InputModal = ({
 }) => {
   const [value, setValue] = useState(defaultValue || '');
 
-  useEffect(() => {
-    if (isOpen) {
-      setValue(defaultValue || '');
-    }
-  }, [isOpen, defaultValue]);
-
   if (!isOpen) return null;
 
   const handleSubmit = () => {
@@ -203,7 +197,7 @@ const MessageBubble = React.memo(({
       setShowCopied(true);
       toast.success('Copied to clipboard!');
       setTimeout(() => setShowCopied(false), 2000);
-    } catch (err) {
+    } catch {
       toast.error('Failed to copy');
     }
   };
@@ -436,7 +430,7 @@ export const ChatPanel = () => {
       isMountedRef.current = false;
       initAbortController.current?.abort();
     };
-  }, []); // Empty deps is correct - only run once on mount
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- initialize once on mount
 
   useEffect(() => {
     if (streamingContent) {
@@ -815,6 +809,7 @@ export const ChatPanel = () => {
       />
       
       <InputModal
+        key={showRenameModal ? `rename-${activeSessionId || 'new'}` : 'rename-closed'}
         isOpen={showRenameModal}
         onClose={() => setShowRenameModal(false)}
         onConfirm={handleRenameConfirm}
@@ -826,4 +821,3 @@ export const ChatPanel = () => {
     </div>
   );
 };
-

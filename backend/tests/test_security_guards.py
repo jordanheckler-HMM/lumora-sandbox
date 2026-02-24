@@ -114,3 +114,68 @@ def test_tools_returns_http_error_when_model_call_fails(tmp_path, monkeypatch):
     )
     assert failed.status_code == 503
     assert "Cannot connect to Ollama" in failed.json()["detail"]
+
+
+def test_health_reports_backend_and_ollama_status(monkeypatch):
+    class FakeResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._payload
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def get(self, *args, **kwargs):
+            return FakeResponse({"models": [{"name": "model-a"}, {"name": "model-b"}]})
+
+    monkeypatch.setattr(main.httpx, "AsyncClient", FakeAsyncClient)
+
+    client = TestClient(main.app)
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["backend"]["status"] == "ok"
+    assert payload["ollama"]["status"] == "ok"
+    assert payload["ollama"]["models_available"] == 2
+
+
+def test_health_reports_ollama_error_when_unreachable(monkeypatch):
+    class FailingAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def get(self, *args, **kwargs):
+            raise main.httpx.RequestError(
+                "connection failed",
+                request=main.httpx.Request("GET", "http://localhost:11434/api/tags"),
+            )
+
+    monkeypatch.setattr(main.httpx, "AsyncClient", FailingAsyncClient)
+
+    client = TestClient(main.app)
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["backend"]["status"] == "ok"
+    assert payload["ollama"]["status"] == "error"
+    assert "Cannot connect to Ollama" in payload["ollama"]["error"]

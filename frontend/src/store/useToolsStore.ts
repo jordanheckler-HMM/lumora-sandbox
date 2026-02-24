@@ -21,7 +21,7 @@ interface ToolsState {
   loading: boolean;
   error: string | null;
   
-  runTool: (toolName: string, workspacePath: string, model: string, activeSheetData?: any) => Promise<void>;
+  runTool: (toolName: string, workspacePath: string, model: string, activeSheetData?: unknown) => Promise<void>;
   clearResult: () => void;
 }
 
@@ -31,7 +31,7 @@ export const useToolsStore = create<ToolsState>((set) => ({
   loading: false,
   error: null,
   
-  runTool: async (toolName: string, workspacePath: string, model: string, activeSheetData?: any) => {
+  runTool: async (toolName: string, workspacePath: string, model: string, activeSheetData?: unknown) => {
     if (!workspacePath) {
       set({ error: 'Workspace path is required' });
       return;
@@ -65,10 +65,23 @@ export const useToolsStore = create<ToolsState>((set) => ({
           result: null
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Tool execution error:', error);
+      let errorMessage = 'Failed to run tool';
+
+      if (axios.isAxiosError(error)) {
+        const detail = error.response?.data;
+        if (detail && typeof detail === 'object' && 'detail' in detail && typeof detail.detail === 'string') {
+          errorMessage = detail.detail;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+      } else if (error instanceof Error && error.message) {
+        errorMessage = error.message;
+      }
+
       set({
-        error: error.response?.data?.detail || error.message || 'Failed to run tool',
+        error: errorMessage,
         loading: false,
         result: null
       });
@@ -79,4 +92,3 @@ export const useToolsStore = create<ToolsState>((set) => ({
     set({ currentTool: null, result: null, error: null });
   }
 }));
-

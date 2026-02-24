@@ -1,4 +1,5 @@
 import { Editor } from '@monaco-editor/react';
+import type { editor as MonacoEditor } from 'monaco-editor';
 import { useAppState } from '../store/appState';
 import { writeFile } from '../api';
 import { useState, useRef, useEffect } from 'react';
@@ -14,7 +15,7 @@ export const CodePanel = () => {
   const [aiPanelOpen, setAIPanelOpen] = useState(false);
   
   // Monaco editor ref for AI actions
-  const editorRef = useRef<any>(null);
+  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   
   // Register global handler for AI panel
   useEffect(() => {
@@ -39,15 +40,16 @@ export const CodePanel = () => {
       });
       setSaveStatus('✓ Saved successfully');
       setTimeout(() => setSaveStatus(null), 3000);
-    } catch (error: any) {
-      setSaveStatus(`✗ Error: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to save file';
+      setSaveStatus(`✗ Error: ${message}`);
       setTimeout(() => setSaveStatus(null), 5000);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleEditorMount = (editor: any) => {
+  const handleEditorMount = (editor: MonacoEditor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
   };
 
@@ -130,4 +132,3 @@ export const CodePanel = () => {
     </div>
   );
 };
-

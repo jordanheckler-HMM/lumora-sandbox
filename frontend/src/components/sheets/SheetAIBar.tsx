@@ -108,9 +108,10 @@ export const SheetAIBar = ({ currentModel, rows }: SheetAIBarProps) => {
       // DO NOT modify the sheet automatically
       // User must explicitly click Insert/Replace actions in sidebar
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('AI action error:', error);
-      toast.error(`Error: ${error.message || 'Failed to process AI request'}`);
+      const message = error instanceof Error ? error.message : 'Failed to process AI request';
+      toast.error(`Error: ${message}`);
     } finally {
       setLoading(false);
       setCurrentAction('');
@@ -226,4 +227,3 @@ export const SheetAIBar = ({ currentModel, rows }: SheetAIBarProps) => {
     </div>
   );
 };
-

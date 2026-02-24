@@ -47,6 +47,22 @@ export interface FileNode {
   children?: FileNode[];
 }
 
+export interface SystemHealth {
+  backend: {
+    status: 'ok' | 'error';
+  };
+  ollama: {
+    status: 'ok' | 'error' | 'unknown';
+    models_available: number;
+    error?: string;
+  };
+}
+
+export const fetchSystemHealth = async (): Promise<SystemHealth> => {
+  const response = await api.get('/health', { timeout: 10000 });
+  return response.data;
+};
+
 export const fetchModels = async (): Promise<Model[]> => {
   const response = await api.get('/models');
   return response.data.models;
@@ -143,18 +159,19 @@ export const chatWithModelStreaming = async (
               onComplete();
               return;
             }
-          } catch (e) {
+          } catch {
             // Skip malformed JSON
           }
         }
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Check if it was an abort
-    if (error.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError') {
       onError('Generation stopped by user');
     } else {
-      onError(error.message || 'Streaming error occurred');
+      const message = error instanceof Error ? error.message : 'Streaming error occurred';
+      onError(message);
     }
   }
 };
@@ -242,4 +259,3 @@ export const deleteChatSession = async (chatId: string): Promise<{ success: bool
   const response = await api.delete(`/chats/${chatId}`);
   return response.data;
 };
-

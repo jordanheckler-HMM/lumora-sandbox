@@ -6,10 +6,12 @@
  */
 
 import { useAppState } from '../../store/appState';
+import type { MutableRefObject } from 'react';
+import type { editor as MonacoEditor } from 'monaco-editor';
 import toast from 'react-hot-toast';
 
 interface CodeAIPanelProps {
-  editorRef: React.MutableRefObject<any>;
+  editorRef: MutableRefObject<MonacoEditor.IStandaloneCodeEditor | null>;
 }
 
 export const CodeAIPanel = ({ editorRef }: CodeAIPanelProps) => {
@@ -24,6 +26,12 @@ export const CodeAIPanel = ({ editorRef }: CodeAIPanelProps) => {
     }
 
     const position = editor.getPosition();
+    if (!position) {
+      navigator.clipboard.writeText(code);
+      toast('Copied to clipboard!', { icon: '📋' });
+      return;
+    }
+
     editor.executeEdits('ai-insert', [{
       range: {
         startLineNumber: position.lineNumber,
@@ -46,6 +54,10 @@ export const CodeAIPanel = ({ editorRef }: CodeAIPanelProps) => {
     }
 
     const selection = editor.getSelection();
+    if (!selection) {
+      handleInsertAtCursor(code);
+      return;
+    }
     
     editor.executeEdits('ai-replace', [{
       range: selection,
@@ -172,4 +184,3 @@ export const CodeAIPanel = ({ editorRef }: CodeAIPanelProps) => {
     </div>
   );
 };
-

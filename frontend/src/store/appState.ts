@@ -14,7 +14,7 @@ export interface ToolOutput {
   id: string;
   timestamp: Date;
   type: 'read' | 'write' | 'search';
-  data: any;
+  data: unknown;
 }
 
 export interface AIResponse {
@@ -221,4 +221,3 @@ export const useAppState = create<AppState>((set) => ({
 
 // Re-export as useStore for backwards compatibility
 export const useStore = useAppState;
-

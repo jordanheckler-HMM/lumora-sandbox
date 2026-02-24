@@ -53,7 +53,7 @@ export const SheetsTab = () => {
   useEffect(() => {
     registerGlobalHandler('documentSidebar', () => handleOpenSidebar('ai'));
     return () => unregisterGlobalHandler('documentSidebar');
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- register once on mount
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -102,9 +102,16 @@ export const SheetsTab = () => {
         rows: data.rows,
         isModified: false,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error parsing CSV:', err);
-      setError(err.response?.data?.detail || err.message || 'Failed to parse CSV file');
+      const detail = typeof err === 'object'
+        && err !== null
+        && 'response' in err
+        && typeof (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail === 'string'
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : null;
+      const message = detail || (err instanceof Error ? err.message : 'Failed to parse CSV file');
+      setError(message);
     } finally {
       setLoading(false);
       // Reset input
@@ -296,6 +303,7 @@ export const SheetsTab = () => {
 
       {/* Right Sidebar */}
       <RightSidebar
+        key={`sheet-sidebar-${sidebarTab}-${sidebarOpen ? 'open' : 'closed'}`}
         editor={null}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}

@@ -132,7 +132,7 @@ export const DocumentsTab = () => {
   useEffect(() => {
     registerGlobalHandler('documentSidebar', () => handleOpenSidebar('ai'));
     return () => unregisterGlobalHandler('documentSidebar');
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- register once on mount
 
   return (
     <div className="flex h-full bg-gray-50 relative">
@@ -305,6 +305,7 @@ export const DocumentsTab = () => {
 
       {/* Right Sidebar */}
       <RightSidebar
+        key={`doc-sidebar-${sidebarTab}-${sidebarOpen ? 'open' : 'closed'}`}
         editor={editor}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -313,4 +314,3 @@ export const DocumentsTab = () => {
     </div>
   );
 };
-

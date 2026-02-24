@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { AIPanel } from './AIPanel';
 import { OutlinePanel } from './OutlinePanel';
@@ -15,13 +15,6 @@ export type SidebarTab = 'ai' | 'outline' | 'versions';
 
 export const RightSidebar = ({ editor, isOpen, onClose, initialTab = 'ai' }: RightSidebarProps) => {
   const [activeTab, setActiveTab] = useState<SidebarTab>(initialTab);
-
-  // Update active tab when initialTab changes
-  useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, [initialTab]);
 
   const renderPanel = () => {
     switch (activeTab) {
@@ -96,4 +89,3 @@ export const RightSidebar = ({ editor, isOpen, onClose, initialTab = 'ai' }: Rig
     </div>
   );
 };
-

@@ -21,6 +21,7 @@ try:
     routes = [route.path for route in main.app.routes]
     required_endpoints = [
         "/",
+        "/health",
         "/models",
         "/run-model",
         "/tools/read_file",
@@ -65,4 +66,3 @@ except ImportError as e:
 except Exception as e:
     print(f"\n❌ Error: {e}")
     sys.exit(1)
-
