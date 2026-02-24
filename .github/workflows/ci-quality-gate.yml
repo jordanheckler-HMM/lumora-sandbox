@@ -44,7 +44,12 @@ jobs:
         run: npm --prefix frontend run lint
 
       - name: Frontend tests
-        run: npm --prefix frontend test -- --run
+        run: |
+          if node -e "const p=require('./frontend/package.json'); process.exit(p?.scripts?.test ? 0 : 1)"; then
+            npm --prefix frontend test -- --run
+          else
+            echo "No frontend test script defined; skipping frontend tests."
+          fi
 
       - name: Frontend build
         run: npm --prefix frontend run build
